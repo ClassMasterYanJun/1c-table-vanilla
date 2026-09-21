@@ -405,11 +405,53 @@ window.tableData и автоматически обновляет таблицу
 Пример:
   var rows = window.getReadyForPrintUuids();
 
-  Результат, например:
-  [{ uuid: "2a38c4bc-df44-4ce6-b5ce-cf6f88df0e12" }];
+   Результат, например:
+   [{ uuid: "2a38c4bc-df44-4ce6-b5ce-cf6f88df0e12" }];
 
 
-4.4. Заказать ВСД
+4.4. window.getReadyForPrintTasks()
+
+Назначение:
+  Возвращает готовые к подготовке печати строки вместе с данными связанного
+  активного задания дирижёра. Используется, чтобы 1С не создавала повторное
+  фоновое задание по строке, которая уже обрабатывается.
+
+Параметры:
+  Нет.
+
+Возвращаемое значение:
+  Array<Object>. В результат попадают те же строки, что и в
+  window.getReadyForPrintUuids():
+
+  {
+    uuid: "uuid-строки",
+    hasActiveTask: true,
+    taskId: "идентификатор-фонового-задания",
+    taskStatus: "running"
+  }
+
+Правило сопоставления:
+  Метод ищет UUID строки в rowUuids активных задач дирижёра типа
+  "preparePrintForms". Если связанная задача не найдена, возвращаются:
+
+  {
+    uuid: "uuid-строки",
+    hasActiveTask: false,
+    taskId: null,
+    taskStatus: null
+  }
+
+  Задача со статусом "failed" также считается активной: повторный запуск
+  возможен только после явного решения 1С удалить или заменить эту задачу.
+
+Пример:
+  var rows = window.getReadyForPrintTasks();
+  var rowsToStart = rows.filter(function (row) {
+    return !row.hasActiveTask;
+  });
+
+
+4.5. Заказать ВСД
 
 Метод:
   window.executeVsdTasks()
@@ -433,7 +475,7 @@ window.tableData и автоматически обновляет таблицу
   var dataFor1C = window.vsdTaskRows;
 
 
-4.5. Ввести отчет о нанесении
+4.6. Ввести отчет о нанесении
 
 Метод:
   window.executeReportTasks()

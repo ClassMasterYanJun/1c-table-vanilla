@@ -615,6 +615,7 @@ round3(emissionWeight - vsdBalance)
 | `window.executeEmissionTasks()` | Формирует и возвращает `window.emissionTaskRows`. |
 | `window.executePrintTasks()` | Формирует и возвращает `window.printTaskRows`. |
 | `window.getReadyForPrintUuids()` | Возвращает массив объектов `{ uuid: "..." }` для строк с `emissionStatus === true` и `printStatus === false`; строки без UUID не включаются. |
+| `window.getReadyForPrintTasks()` | Возвращает готовые к подготовке печати UUID с `hasActiveTask`, `taskId` и `taskStatus`; позволяет 1С не запускать повторное задание `preparePrintForms` по уже обрабатываемой строке. |
 | `window.executeVsdTasks()` | Формирует и возвращает `window.vsdTaskRows`. |
 | `window.executeReportTasks()` | Формирует и возвращает отмеченные `window.reportTaskRows`. |
 | `window.editRow(id)` | Выделяет строку с указанным `id` и прокручивает таблицу к ней. |

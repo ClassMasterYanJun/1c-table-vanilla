@@ -55,6 +55,7 @@ var tasksResizer=document.getElementById("tasksResizer"),tasksPanel=document.que
 <script>
 (function(){"use strict";
 window.getReadyForPrintUuids=function(){return window.tableData.filter(function(row){return row.emissionStatus===true&&row.printStatus===false&&row.uuid!==undefined&&row.uuid!==null}).map(function(row){return{uuid:row.uuid}})};
+window.getReadyForPrintTasks=function(){var activeTasks=typeof window.getActiveConductorTasks==="function"?window.getActiveConductorTasks():[],tasksByUuid={},i,j,task,uuid;for(i=0;i<activeTasks.length;i++){task=activeTasks[i];if(task.type!=="preparePrintForms")continue;for(j=0;j<task.rowUuids.length;j++){uuid=task.rowUuids[j];if(!tasksByUuid[uuid])tasksByUuid[uuid]=task}}return window.getReadyForPrintUuids().map(function(row){task=tasksByUuid[row.uuid];return{uuid:row.uuid,hasActiveTask:!!task,taskId:task?task.taskId:null,taskStatus:task?task.status:null}})};
 })();
 </script>
 <script>
