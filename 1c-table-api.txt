@@ -1,0 +1,568 @@
+ИНТЕГРАЦИЯ 1С С ТАБЛИЦЕЙ
+Файл страницы: 1c-table-vanilla.html
+
+
+1. ЗАГРУЗКА И ПОЛУЧЕНИЕ ДАННЫХ ТАБЛИЦЫ
+
+1.1. window.setTableData(data)
+
+Назначение:
+  Полностью заменяет данные таблицы, сортирует строки по полю nomenclature
+  и перерисовывает интерфейс.
+
+Параметры:
+  data - Array<Object> или String.
+  Допускается готовый массив строк либо JSON-строка, содержащая массив
+  объектов.
+
+Пример:
+  window.setTableData([
+    {
+      id: 101,
+      uuid: "2a38c4bc-df44-4ce6-b5ce-cf6f88df0e12",
+      rowNumber: 1,
+      nomenclature: "Колбаса вареная",
+      isWeighted: false,
+      unit: "шт",
+      weightPerUnit: 0.45,
+      emissionStatus: true,
+      marksCount: 150,
+      printStatus: false,
+      printed: true,
+      emissionWeight: 45,
+      emissionQuantity: 100,
+      vsdBalance: 20
+    }
+  ]);
+
+Пример передачи JSON-строки из 1С:
+  var json = '[{"id":101,"uuid":"2a38c4bc-df44-4ce6-b5ce-cf6f88df0e12",' +
+    '"rowNumber":1,"nomenclature":"Колбаса вареная",' +
+    '"isWeighted":false,"unit":"шт","weightPerUnit":0.45,' +
+    '"emissionStatus":true,"marksCount":150,"printStatus":false,' +
+    '"printed":true,"emissionWeight":45,"emissionQuantity":100,' +
+    '"vsdBalance":20}]';
+  window.setTableData(json);
+
+Возвращаемое значение:
+  Нет.
+
+Важно:
+  Поле printed должно передаваться типом Boolean: true или false.
+  При некорректной JSON-строке или JSON, содержащем не массив, текущие данные
+  таблицы остаются без изменений.
+
+
+1.2. window.tableData
+
+Назначение:
+  Глобальное свойство с текущими строками таблицы.
+
+Получение:
+  var data = window.tableData;
+
+Установка:
+  window.tableData = data;
+
+Установка эквивалентна вызову window.setTableData(data).
+
+
+1.3. window.rows
+
+Назначение:
+  Алиас для window.tableData.
+
+Пример:
+  var data = window.rows;
+  window.rows = data;
+
+
+1.4. window.GetDataTo1C()
+
+Назначение:
+  Возвращает копии всех текущих строк таблицы, включая правки пользователя.
+
+Параметры:
+  Нет.
+
+Возвращаемое значение:
+  Array<Object>.
+
+Пример:
+  var data = window.GetDataTo1C();
+
+
+1.5. window.refreshTable()
+
+Назначение:
+  Сортирует и перерисовывает таблицу.
+
+Использование:
+  Требуется после прямого изменения объекта в window.tableData.
+
+Пример:
+  window.tableData[0].printed = true;
+  window.refreshTable();
+
+Параметры:
+  Нет.
+
+Возвращаемое значение:
+  Нет.
+
+
+1.6. Автоматическое отслеживание прямых изменений
+
+Страница раз в 500 мс проверяет изменение любых полей в строках
+window.tableData и автоматически обновляет таблицу и разделы задач.
+
+Пример прямого изменения из 1С:
+  window.tableData[0].marksCount = 50;
+  window.tableData[0].printed = true;
+
+После изменения обновление будет выполнено автоматически не позднее чем
+через 500 мс. Ручной вызов window.refreshTable() не требуется.
+
+Для немедленной проверки доступен метод:
+  window.checkTableDataChanges()
+
+Параметры:
+  Нет.
+
+Возвращаемое значение:
+  true  - изменения обнаружены, интерфейс обновлен;
+  false - изменений нет.
+
+
+1.7. window.updateRowByUuid(uuid, values)
+
+Назначение:
+  Находит строку по uuid, обновляет переданные поля и сразу перерисовывает
+  таблицу и разделы задач.
+
+Параметры:
+  uuid - String, идентификатор строки в поле uuid.
+  values - Object или JSON-строка с объектом полей для обновления.
+
+Пример с объектом:
+  var updatedRow = window.updateRowByUuid(
+    "2a38c4bc-df44-4ce6-b5ce-cf6f88df0e12",
+    {
+      marksCount: 50,
+      printed: true,
+      emissionWeight: 12.5,
+      emissionQuantity: 28
+    }
+  );
+
+Пример с JSON-строкой:
+  var updatedRow = window.updateRowByUuid(
+    "2a38c4bc-df44-4ce6-b5ce-cf6f88df0e12",
+    '{"printStatus":false,"printed":true,"marksCount":50}'
+  );
+
+Возвращаемое значение:
+  Object - копия обновленной строки;
+  null   - uuid не найден или переданы некорректные параметры.
+
+Ограничения:
+  Поля uuid и id через этот метод не изменяются.
+  Если обновлены emissionWeight или emissionQuantity, эти правки сохраняются
+  и не будут потеряны при следующем SetDataFrom1C().
+
+
+2. УПРАВЛЯЕМЫЙ ОБМЕН С 1С И ДИРИЖЁР
+
+2.1. window.getDataFrom1C()
+
+Назначение:
+  Необязательный обратный вызов для совместимой ручной полной синхронизации.
+  Он вызывается только при явном вызове window.SetDataFrom1C(); автоматического
+  вызова каждые 5 секунд больше нет.
+
+Параметры:
+  Нет.
+
+Возвращаемое значение:
+  Array<Object> или String.
+  Допускается массив строк либо JSON-строка с массивом строк.
+
+Пример реализации со стороны 1С:
+  window.getDataFrom1C = function () {
+    return '[ ... ]';
+  };
+
+
+2.2. window.SetDataFrom1C()
+
+Назначение:
+  Запускает синхронизацию данных из window.getDataFrom1C().
+
+Действия:
+  1. Вызывает window.getDataFrom1C(), если функция определена.
+  2. При получении JSON-строки преобразует ее через JSON.parse().
+  3. Проверяет, что результат является массивом строк.
+  4. Сохраняет локальные правки emissionWeight и emissionQuantity.
+  5. Сортирует строки по nomenclature.
+  6. Обновляет таблицу и все разделы панели задач.
+
+Параметры:
+  Нет.
+
+Возвращаемое значение:
+  Нет.
+
+Пример:
+  window.SetDataFrom1C();
+
+
+2.3. Встроенный дирижёр
+
+  В `1c-table-vanilla.html` встроен скрытый дирижёр процессов с кнопкой
+  `#conductorTickBtn`. Его единственный периодический цикл нажимает кнопку раз
+  в 5000 мс, в том числе при пустых задачах и очереди. Параллельные циклы
+  блокируются флагом `processing`; блокировка снимается ответом 1С либо
+  тайм-аутом через 60000 мс.
+
+  1С предоставляет window.processConductorIn1C(state) и может вернуть ответ
+  синхронно либо позднее вызвать window.applyConductorResponse(response).
+  Полный контракт: `1c-conductor-api.txt`.
+
+   Дирижёр не вызывает SetDataFrom1C() автоматически. Если 1С сообщает о
+   завершении задачи через taskUpdates со status: "completed", страница берёт
+   rowUuids из ранее добавленной задачи, устанавливает printStatus: true у
+   соответствующих строк и удаляет задачу из состояния дирижёра.
+
+   Пример ответа 1С:
+
+     window.applyConductorResponse({
+       taskUpdates: [
+         { taskId: "идентификатор-фонового-задания", status: "completed" }
+       ]
+     });
+
+   Массив completedTaskIds поддерживается для совместимости и выполняет те же
+   действия: устанавливает printStatus: true у строк задачи и удаляет её.
+   Статус "failed" не меняет строки и оставляет задачу в состоянии дирижёра.
+
+  Полная загрузка допустима при открытии формы или по явной команде 1С через
+  window.setTableData(data) либо window.SetDataFrom1C().
+
+
+3. НАСТРОЙКИ ПЕЧАТИ
+
+3.1. window.setPrintSettings(settings)
+
+Назначение:
+  Устанавливает параметры верхней панели печати.
+
+Параметр settings:
+  {
+    markingDate: "31.12.2026",
+    labelTemplates: [
+      { value: "template-id", text: "Наименование шаблона" }
+    ],
+    labelTemplate: "template-id",
+    numberLabels: true,
+    sendToPrinter: false
+  }
+
+Все поля settings необязательны. Параметр может быть передан готовым объектом
+или JSON-строкой, содержащей такой объект.
+
+Пример:
+   window.setPrintSettings({
+     markingDate: "31.12.2026",
+     labelTemplates: [
+      { value: "20x20", text: "С наименованием, 20 x 20" },
+      { value: "58x40", text: "Транспортная, 58 x 40" }
+    ],
+    labelTemplate: "58x40",
+    numberLabels: true,
+    sendToPrinter: true
+   });
+
+Пример передачи JSON-строки из 1С:
+  window.setPrintSettings('{"markingDate":"08.09.2026","labelTemplates":[' +
+    '{"value":"e142d21c-8706-11f1-8ea8-30560f07db95","text":"20*20"},' +
+    '{"value":"450dc837-8c77-11f1-8eaf-30560f07db95","text":"С наименованием (20*20)"}' +
+    '],"labelTemplate":"450dc837-8c77-11f1-8eaf-30560f07db95",' +
+    '"numberLabels":false,"sendToPrinter":false}');
+
+Важно:
+  Страница не содержит предустановленных параметров печати. До вызова
+  window.setPrintSettings() дата и список шаблонов остаются пустыми, а флажки
+  сняты. Все параметры верхней панели должны передаваться из 1С.
+
+Возвращаемое значение:
+  Нет.
+
+
+3.2. window.getPrintSettings()
+
+Назначение:
+  Возвращает текущие параметры печати.
+
+Параметры:
+  Нет.
+
+Возвращаемое значение:
+  {
+    markingDate: "ДД.ММ.ГГГГ",
+    labelTemplate: "template-id",
+    numberLabels: true,
+    sendToPrinter: false
+  }
+
+Пример:
+  var settings = window.getPrintSettings();
+
+
+3.3. window.printSettings
+
+Назначение:
+  Глобальный объект текущих настроек печати.
+
+Получение:
+  var settings = window.printSettings;
+
+Для изменения рекомендуется window.setPrintSettings(settings), так как
+этот метод также обновляет интерфейс.
+
+
+4. ЗАДАЧИ И МАССИВЫ ДЛЯ 1С
+
+Все методы данного раздела не принимают параметров. Каждый метод возвращает
+сформированный массив и записывает его в соответствующее свойство window.
+
+4.1. К эмиссии марок
+
+Метод:
+  window.executeEmissionTasks()
+
+Результат:
+  window.emissionTaskRows
+
+Правило отбора:
+  emissionQuantity > 0
+
+В строках результата доступны исходные поля, включая:
+  uuid, nomenclature, emissionWeight, emissionQuantity.
+
+Пример:
+  var tasks = window.executeEmissionTasks();
+  var dataFor1C = window.emissionTaskRows;
+
+
+4.2. Напечатать КМ по очереди
+
+Метод:
+  window.executePrintTasks()
+
+Результат:
+  window.printTaskRows
+
+Правило отбора:
+  printStatus === true
+
+Количество КМ:
+  Поле marksCount.
+
+Пример:
+  var tasks = window.executePrintTasks();
+  var dataFor1C = window.printTaskRows;
+
+
+4.3. window.getReadyForPrintUuids()
+
+Назначение:
+  Возвращает UUID строк, для которых эмиссия завершена, а печать ещё не готова.
+
+Параметры:
+  Нет.
+
+Возвращаемое значение:
+  Array<Object> - массив объектов вида `{ uuid: "..." }`. Строки без `uuid`
+  в результат не включаются.
+
+Правило отбора:
+  emissionStatus === true && printStatus === false
+
+Пример:
+  var rows = window.getReadyForPrintUuids();
+
+  Результат, например:
+  [{ uuid: "2a38c4bc-df44-4ce6-b5ce-cf6f88df0e12" }];
+
+
+4.4. Заказать ВСД
+
+Метод:
+  window.executeVsdTasks()
+
+Результат:
+  window.vsdTaskRows
+
+Правило отбора:
+  vsdBalance < emissionWeight
+
+В каждую строку результата добавляется вычисляемое поле:
+  vsdShortageKg
+
+Расчет:
+  vsdShortageKg = emissionWeight - vsdBalance
+
+Результат округляется до трех знаков после запятой.
+
+Пример:
+  var tasks = window.executeVsdTasks();
+  var dataFor1C = window.vsdTaskRows;
+
+
+4.5. Ввести отчет о нанесении
+
+Метод:
+  window.executeReportTasks()
+
+Результат:
+  window.reportTaskRows
+
+Правило отображения строк в панели:
+  printed === true && printStatus === false
+
+Правило формирования результата:
+  В window.reportTaskRows попадают только строки, которые пользователь
+  отметил флажком в списке отчета.
+
+Если ни одна строка не выбрана:
+  window.reportTaskRows === []
+
+Пример:
+  var tasks = window.executeReportTasks();
+  var dataFor1C = window.reportTaskRows;
+
+
+5. ОБРАТНЫЙ ВЫЗОВ ПЕЧАТИ ОДНОЙ СТРОКИ
+
+5.1. window.printRow(row)
+
+Назначение:
+  Необязательная функция, которую предоставляет 1С. Страница вызывает ее
+  при нажатии пользователем на иконку принтера в колонке "Печать".
+
+Параметр row:
+  Object - полная строка таблицы.
+
+Пример реализации со стороны 1С:
+  window.printRow = function (row) {
+    // Использовать row.uuid, row.nomenclature, row.marksCount и другие поля.
+  };
+
+
+6. ПЕРЕХОД К СТРОКЕ
+
+6.1. window.editRow(id)
+
+Назначение:
+  Выделяет строку по id и прокручивает таблицу до нее.
+
+Параметр:
+  id - значение, совпадающее с полем row.id.
+
+Пример:
+  window.editRow(25);
+
+Возвращаемое значение:
+  Нет.
+
+
+7. ВСПОМОГАТЕЛЬНЫЕ ГЛОБАЛЬНЫЕ ДАННЫЕ
+
+7.1. window.editedRows
+
+Назначение:
+  Объект локальных правок пользователя в полях emissionWeight и
+  emissionQuantity. Используется при следующем SetDataFrom1C().
+
+Пример:
+  {
+    "25": {
+      emissionWeight: 12.5,
+      emissionQuantity: 28
+    }
+  }
+
+
+7.2. window.isWeightedProduct(row)
+
+Назначение:
+  Проверяет, является ли строка весовым товаром.
+
+Параметр:
+  row - Object.
+
+Возвращаемое значение:
+  Boolean.
+
+Логика:
+  1. Использует row.isWeighted, если это Boolean.
+  2. Иначе проверяет unit: "кг", "килограмм" или "kilogram".
+
+
+8. ФУНКЦИИ МОДАЛЬНОГО ОКНА ВЕСОВОГО ТОВАРА
+
+Эти функции относятся к интерфейсу страницы. Для штатного обмена с 1С
+обычно не требуются.
+
+8.1. window.calculateModalResult()
+  Пересчитывает количество в открытом модальном окне.
+  Параметры: нет.
+
+8.2. window.confirmWeightModal()
+  Применяет введенные в модальном окне вес и количество.
+  Параметры: нет.
+
+8.3. window.closeWeightModal()
+  Закрывает модальное окно с отменой изменений.
+  Параметры: нет.
+
+
+9. ФОРМАТ СТРОКИ ТАБЛИЦЫ
+
+{
+  id: 1,
+  uuid: "00000000-0000-4000-8000-000000000001",
+  rowNumber: 1,
+  nomenclature: "Наименование товара",
+
+  isWeighted: false,
+  unit: "шт",
+  weightPerUnit: 0.45,
+
+  emissionStatus: true,
+  marksCount: 100,
+
+  printStatus: false,
+  printed: true,
+
+  emissionWeight: 45,
+  emissionQuantity: 100,
+
+  vsdBalance: 20
+}
+
+Критически важные типы:
+  id: number или string
+  uuid: string
+  rowNumber: number
+  nomenclature: string
+  isWeighted: boolean
+  unit: string
+  weightPerUnit: number
+  emissionStatus: boolean
+  marksCount: number
+  printStatus: boolean
+  printed: boolean
+  emissionWeight: number
+  emissionQuantity: number
+  vsdBalance: number
