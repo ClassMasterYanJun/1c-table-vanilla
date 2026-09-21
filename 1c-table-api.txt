@@ -224,11 +224,25 @@ window.tableData и автоматически обновляет таблицу
   блокируются флагом `processing`; блокировка снимается ответом 1С либо
   тайм-аутом через 60000 мс.
 
-  1С предоставляет window.processConductorIn1C(state) и может вернуть ответ
-  синхронно либо позднее вызвать window.applyConductorResponse(response).
-  Полный контракт: `1c-conductor-api.txt`.
+   1С предоставляет window.processConductorIn1C(state) и может вернуть ответ
+   синхронно либо позднее вызвать window.applyConductorResponse(response).
+   Полный контракт: `1c-conductor-api.txt`.
 
-   Дирижёр не вызывает SetDataFrom1C() автоматически. Если 1С сообщает о
+   При каждом вызове `processConductorIn1C(state)` список активных фоновых
+   заданий передаётся в `state.tasks`. Каждая задача содержит `taskId`, `type`,
+   `status`, `rowUuids`, `createdAt` и `payload`. Для отдельного чтения списка
+   из 1С доступен `window.getActiveConductorTasks()`; метод возвращает копию
+   массива `state.tasks`.
+
+   Пример обработчика 1С:
+
+     window.processConductorIn1C = function (state) {
+       var activeTasks = state.tasks;
+       // Проверить статусы фоновых заданий по activeTasks[i].taskId.
+       return { taskUpdates: [] };
+     };
+
+    Дирижёр не вызывает SetDataFrom1C() автоматически. Если 1С сообщает о
    завершении задачи через taskUpdates со status: "completed", страница берёт
    rowUuids из ранее добавленной задачи, устанавливает printStatus: true у
    соответствующих строк и удаляет задачу из состояния дирижёра.
